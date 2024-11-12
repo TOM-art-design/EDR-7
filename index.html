@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Date Detection from Laptop Camera</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        video {
+            width: 100%;
+            max-width: 600px;
+            margin-top: 20px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        canvas {
+            display: none;
+        }
+        #output {
+            font-size: 1.2em;
+            margin-top: 15px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h2>Live Date Detection from Laptop Camera</h2>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+    <p id="output">Detected Dates Will Appear Here...</p>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const output = document.getElementById('output');
+        const context = canvas.getContext('2d');
+
+        // Request access to laptop camera
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                video.onloadedmetadata = () => video.play();
+            } catch (error) {
+                console.error("Error accessing the camera:", error);
+                output.textContent = "Camera access denied. Please allow camera access.";
+            }
+        }
+
+        // Capture a frame from the video and perform OCR to detect dates
+        function captureFrameAndDetect() {
+            const width = video.videoWidth;
+            const height = video.videoHeight;
+            canvas.width = width;
+            canvas.height = height;
+
+            // Draw current video frame onto the canvas
+            context.drawImage(video, 0, 0, width, height);
+            const imageDataUrl = canvas.toDataURL('image/png');
+
+            // Use Tesseract.js to recognize text from the captured frame
+            Tesseract.recognize(imageDataUrl, 'eng', {
+                logger: (m) => console.log(m)  // Optional: logs OCR progress
+            }).then(({ data: { text } }) => {
+                // Regex patterns for detecting date formats like YYYY-MM-DD or DD-MM-YYYY
+                const datePatterns = [
+                    /\b\d{4}-\d{2}-\d{2}\b/g,   // YYYY-MM-DD
+                    /\b\d{2}-\d{2}-\d{4}\b/g    // DD-MM-YYYY
+                ];
+
+                // Find dates in recognized text and store unique dates
+                const detectedDates = new Set();
+                datePatterns.forEach(pattern => {
+                    const matches = text.match(pattern);
+                    if (matches) {
+                        matches.forEach(date => detectedDates.add(date));
+                    }
+                });
+
+                // Display detected dates or a message if no dates are found
+                if (detectedDates.size > 0) {
+                    output.textContent = "Detected Dates: " + Array.from(detectedDates).join(", ");
+                } else {
+                    output.textContent = "No date found in the current frame.";
+                }
+            }).catch(error => {
+                console.error("Error processing the image:", error);
+                output.textContent = "Error processing the image.";
+            });
+        }
+
+        // Start capturing frames every 3 seconds
+        startCamera().then(() => {
+            setInterval(captureFrameAndDetect, 3000);  // Adjust interval as needed
+        });
+    </script>
+</body>
+</html>
