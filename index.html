@@ -9,6 +9,9 @@
         body {
             font-family: Arial, sans-serif;
             text-align: center;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
         }
         video {
             width: 100%;
@@ -25,6 +28,10 @@
             margin-top: 15px;
             color: #333;
         }
+        h2 {
+            font-size: 24px;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -39,9 +46,13 @@
         const output = document.getElementById('output');
         const context = canvas.getContext('2d');
 
+        // Access camera, ensure back-facing camera is used
         async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const constraints = {
+                    video: { facingMode: "environment" }  // Use back camera
+                };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 video.onloadedmetadata = () => video.play();
             } catch (error) {
@@ -50,21 +61,23 @@
             }
         }
 
+        // Capture frame and perform OCR on the captured image
         function captureFrameAndDetect() {
             const width = video.videoWidth;
             const height = video.videoHeight;
             canvas.width = width;
             canvas.height = height;
 
-            context.drawImage(video, 0, 0, width, height);
-            const imageDataUrl = canvas.toDataURL('image/png');
+            context.drawImage(video, 0, 0, width, height);  // Draw video frame onto canvas
+            const imageDataUrl = canvas.toDataURL('image/png'); // Capture as PNG
 
+            // Run Tesseract.js OCR to detect dates
             Tesseract.recognize(imageDataUrl, 'eng', {
-                logger: (m) => console.log(m)
+                logger: (m) => console.log(m)  // Optional logging for OCR progress
             }).then(({ data: { text } }) => {
                 const datePatterns = [
-                    /\b\d{4}-\d{2}-\d{2}\b/g,
-                    /\b\d{2}-\d{2}-\d{4}\b/g
+                    /\b\d{4}-\d{2}-\d{2}\b/g,  // YYYY-MM-DD
+                    /\b\d{2}-\d{2}-\d{4}\b/g   // DD-MM-YYYY
                 ];
 
                 const detectedDates = new Set();
@@ -75,6 +88,7 @@
                     }
                 });
 
+                // Show detected dates or a message if no date found
                 if (detectedDates.size > 0) {
                     output.textContent = "Detected Dates: " + Array.from(detectedDates).join(", ");
                 } else {
@@ -86,8 +100,9 @@
             });
         }
 
+        // Start camera and begin OCR every 3 seconds
         startCamera().then(() => {
-            setInterval(captureFrameAndDetect, 3000);  // Captures frame every 3 seconds
+            setInterval(captureFrameAndDetect, 3000);  // Adjust interval as needed (3 seconds)
         });
     </script>
 </body>
