@@ -46,7 +46,7 @@
         const output = document.getElementById('output');
         const context = canvas.getContext('2d');
 
-        // Access camera, ensure back-facing camera is used
+        // Access camera and use the back-facing camera
         async function startCamera() {
             try {
                 const constraints = {
@@ -61,23 +61,44 @@
             }
         }
 
-        // Capture frame and perform OCR on the captured image
-        function captureFrameAndDetect() {
+        // Pre-process the image to improve OCR accuracy (Grayscale and Threshold)
+        function preprocessImage() {
             const width = video.videoWidth;
             const height = video.videoHeight;
             canvas.width = width;
             canvas.height = height;
 
             context.drawImage(video, 0, 0, width, height);  // Draw video frame onto canvas
-            const imageDataUrl = canvas.toDataURL('image/png'); // Capture as PNG
 
-            // Run Tesseract.js OCR to detect dates
+            // Applying Grayscale and Threshold for better OCR
+            const imageData = context.getImageData(0, 0, width, height);
+            const data = imageData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                const threshold = 128;  // Threshold for binarization
+                const color = avg >= threshold ? 255 : 0;
+                data[i] = data[i + 1] = data[i + 2] = color;
+            }
+
+            context.putImageData(imageData, 0, 0);
+        }
+
+        // Capture frame and perform OCR to detect dates
+        function captureFrameAndDetect() {
+            preprocessImage();  // Pre-process the captured frame
+
+            const imageDataUrl = canvas.toDataURL('image/png'); // Capture the image as PNG
+
+            // Use Tesseract.js OCR to detect text
             Tesseract.recognize(imageDataUrl, 'eng', {
-                logger: (m) => console.log(m)  // Optional logging for OCR progress
+                logger: (m) => console.log(m)  // Optional: log OCR progress
             }).then(({ data: { text } }) => {
                 const datePatterns = [
                     /\b\d{4}-\d{2}-\d{2}\b/g,  // YYYY-MM-DD
-                    /\b\d{2}-\d{2}-\d{4}\b/g   // DD-MM-YYYY
+                    /\b\d{2}-\d{2}-\d{4}\b/g,   // DD-MM-YYYY
+                    /\b\d{2}\/\d{2}\/\d{4}\b/g, // MM/DD/YYYY
+                    /\b\d{4}\/\d{2}\/\d{2}\b/g  // YYYY/MM/DD
                 ];
 
                 const detectedDates = new Set();
@@ -88,7 +109,7 @@
                     }
                 });
 
-                // Show detected dates or a message if no date found
+                // Display detected dates or a message if no date is found
                 if (detectedDates.size > 0) {
                     output.textContent = "Detected Dates: " + Array.from(detectedDates).join(", ");
                 } else {
@@ -100,9 +121,9 @@
             });
         }
 
-        // Start camera and begin OCR every 3 seconds
+        // Start camera and begin capturing frames every 2 seconds
         startCamera().then(() => {
-            setInterval(captureFrameAndDetect, 3000);  // Adjust interval as needed (3 seconds)
+            setInterval(captureFrameAndDetect, 2000);  // Captures frame every 2 seconds
         });
     </script>
 </body>
