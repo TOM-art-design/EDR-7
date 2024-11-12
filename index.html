@@ -35,7 +35,7 @@
     </style>
 </head>
 <body>
-    <h2>Live Date Detection</h2>
+    <h2>Live Date Detection 7.1</h2>
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
     <p id="output">Detected Dates Will Appear Here...</p>
@@ -70,15 +70,13 @@
 
             context.drawImage(video, 0, 0, width, height);  // Draw video frame onto canvas
 
-            // Applying Grayscale and Threshold for better OCR
+            // Apply Grayscale to the image
             const imageData = context.getImageData(0, 0, width, height);
             const data = imageData.data;
 
             for (let i = 0; i < data.length; i += 4) {
                 const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                const threshold = 128;  // Threshold for binarization
-                const color = avg >= threshold ? 255 : 0;
-                data[i] = data[i + 1] = data[i + 2] = color;
+                data[i] = data[i + 1] = data[i + 2] = avg; // Set RGB to grayscale
             }
 
             context.putImageData(imageData, 0, 0);
@@ -92,13 +90,17 @@
 
             // Use Tesseract.js OCR to detect text
             Tesseract.recognize(imageDataUrl, 'eng', {
-                logger: (m) => console.log(m)  // Optional: log OCR progress
+                logger: (m) => console.log(m)  // Log OCR progress for debugging
             }).then(({ data: { text } }) => {
+                console.log("OCR Result: ", text); // Log the full OCR result
+
                 const datePatterns = [
                     /\b\d{4}-\d{2}-\d{2}\b/g,  // YYYY-MM-DD
                     /\b\d{2}-\d{2}-\d{4}\b/g,   // DD-MM-YYYY
                     /\b\d{2}\/\d{2}\/\d{4}\b/g, // MM/DD/YYYY
-                    /\b\d{4}\/\d{2}\/\d{2}\b/g  // YYYY/MM/DD
+                    /\b\d{4}\/\d{2}\/\d{2}\b/g, // YYYY/MM/DD
+                    /\b\d{1,2}\s?[A-Za-z]+\s?\d{4}\b/g, // 1st January 2020
+                    /\b\d{1,2}[\s\-\/]?[A-Za-z]{3}[\s\-\/]?\d{4}\b/g // 25-Jan-2020 or 25/Jan/2020
                 ];
 
                 const detectedDates = new Set();
